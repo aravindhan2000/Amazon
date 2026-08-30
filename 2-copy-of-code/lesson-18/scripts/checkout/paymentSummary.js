@@ -1,8 +1,10 @@
-import {cart} from '../../data/cart.js';
+import {cart, calculateCartQuantity} from '../../data/cart.js';
 import {getProduct} from '../../data/products.js';
 import {getDeliveryOption} from '../../data/deliveryOptions.js';
 import {formatCurrency} from '../utils/money.js';
 import {addOrder} from '../../data/orders.js';
+
+const TAX_RATE = 0.1;
 
 export function renderPaymentSummary() {
   let productPriceCents = 0;
@@ -16,8 +18,9 @@ export function renderPaymentSummary() {
     shippingPriceCents += deliveryOption.priceCents;
   });
 
+  const cartQuantity = calculateCartQuantity();
   const totalBeforeTaxCents = productPriceCents + shippingPriceCents;
-  const taxCents = totalBeforeTaxCents * 0.1;
+  const taxCents = totalBeforeTaxCents * TAX_RATE;
   const totalCents = totalBeforeTaxCents + taxCents;
 
   const paymentSummaryHTML = `
@@ -26,7 +29,7 @@ export function renderPaymentSummary() {
     </div>
 
     <div class="payment-summary-row">
-      <div>Items (3):</div>
+      <div>Items (${cartQuantity}):</div>
       <div class="payment-summary-money">
         $${formatCurrency(productPriceCents)}
       </div>
@@ -47,7 +50,7 @@ export function renderPaymentSummary() {
     </div>
 
     <div class="payment-summary-row">
-      <div>Estimated tax (10%):</div>
+      <div>Estimated tax (${TAX_RATE * 100}%):</div>
       <div class="payment-summary-money">
         $${formatCurrency(taxCents)}
       </div>
@@ -61,9 +64,11 @@ export function renderPaymentSummary() {
     </div>
 
     <button class="place-order-button button-primary
-      js-place-order">
+      js-place-order" ${cartQuantity === 0 ? 'disabled' : ''}>
       Place your order
     </button>
+
+    <div class="payment-summary-error js-payment-summary-error"></div>
   `;
 
   document.querySelector('.js-payment-summary')
@@ -82,13 +87,18 @@ export function renderPaymentSummary() {
           })
         });
 
+        if (!response.ok) {
+          throw new Error(`Failed to place order: ${response.status}`);
+        }
+
         const order = await response.json();
         addOrder(order);
 
-      } catch (error) {
-        console.log('Unexpected error. Try again later.');
-      }
+        window.location.href = 'orders.html';
 
-      window.location.href = 'orders.html';
+      } catch {
+        document.querySelector('.js-payment-summary-error').innerHTML =
+          'Unexpected error. Please try again later.';
+      }
     });
 }

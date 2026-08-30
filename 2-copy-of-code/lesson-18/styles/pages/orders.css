@@ -218,3 +218,8 @@
     padding: 12px;
   }
 }
+
+.orders-message {
+  font-size: 18px;
+  padding: 20px 0;
+}

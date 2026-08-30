@@ -1,31 +1,37 @@
-import {cart, removeFromCart, updateDeliveryOption} from '../../data/cart.js';
-import {products, getProduct} from '../../data/products.js';
+import {
+  cart,
+  removeFromCart,
+  updateDeliveryOption,
+  updateQuantity
+} from '../../data/cart.js';
+import {getProduct} from '../../data/products.js';
 import {formatCurrency} from '../utils/money.js';
-import {hello} from 'https://unpkg.com/supersimpledev@1.0.1/hello.esm.js';
-import dayjs from 'https://unpkg.com/dayjs@1.11.10/esm/index.js';
+import {formatDeliveryDate} from '../utils/deliveryDate.js';
 import {deliveryOptions, getDeliveryOption} from '../../data/deliveryOptions.js';
 import {renderPaymentSummary} from './paymentSummary.js';
+import {updateCartQuantityDisplay} from '../shared/header.js';
+
+const MIN_QUANTITY = 1;
+const MAX_QUANTITY = 1000;
 
 export function renderOrderSummary() {
+  if (cart.length === 0) {
+    document.querySelector('.js-order-summary').innerHTML = `
+      <div class="empty-cart-message">
+        Your cart is empty.
+        <a class="link-primary" href="amazon.html">View products</a>
+      </div>
+    `;
+    updateCheckoutHeaderQuantity();
+    return;
+  }
+
   let cartSummaryHTML = '';
 
   cart.forEach((cartItem) => {
-    const productId = cartItem.productId;
-
-    const matchingProduct = getProduct(productId);
-
-    const deliveryOptionId = cartItem.deliveryOptionId;
-
-    const deliveryOption = getDeliveryOption(deliveryOptionId);
-
-    const today = dayjs();
-    const deliveryDate = today.add(
-      deliveryOption.deliveryDays,
-      'days'
-    );
-    const dateString = deliveryDate.format(
-      'dddd, MMMM D'
-    );
+    const matchingProduct = getProduct(cartItem.productId);
+    const deliveryOption = getDeliveryOption(cartItem.deliveryOptionId);
+    const dateString = formatDeliveryDate(deliveryOption);
 
     cartSummaryHTML += `
       <div class="cart-item-container
@@ -37,6 +43,7 @@ export function renderOrderSummary() {
 
         <div class="cart-item-details-grid">
           <img class="product-image"
+            alt="${matchingProduct.name}"
             src="${matchingProduct.image}">
 
           <div class="cart-item-details">
@@ -51,8 +58,16 @@ export function renderOrderSummary() {
               <span>
                 Quantity: <span class="quantity-label">${cartItem.quantity}</span>
               </span>
-              <span class="update-quantity-link link-primary">
+              <span class="update-quantity-link link-primary js-update-link"
+                data-product-id="${matchingProduct.id}">
                 Update
+              </span>
+              <input class="quantity-input js-quantity-input-${matchingProduct.id}"
+                type="number" min="${MIN_QUANTITY}" max="${MAX_QUANTITY}"
+                value="${cartItem.quantity}">
+              <span class="save-quantity-link link-primary js-save-link"
+                data-product-id="${matchingProduct.id}">
+                Save
               </span>
               <span class="delete-quantity-link link-primary js-delete-link
                 js-delete-link-${matchingProduct.id}"
@@ -77,14 +92,7 @@ export function renderOrderSummary() {
     let html = '';
 
     deliveryOptions.forEach((deliveryOption) => {
-      const today = dayjs();
-      const deliveryDate = today.add(
-        deliveryOption.deliveryDays,
-        'days'
-      );
-      const dateString = deliveryDate.format(
-        'dddd, MMMM D'
-      );
+      const dateString = formatDeliveryDate(deliveryOption);
 
       const priceString = deliveryOption.priceCents === 0
         ? 'FREE'
@@ -109,7 +117,7 @@ export function renderOrderSummary() {
             </div>
           </div>
         </div>
-      `
+      `;
     });
 
     return html;
@@ -118,20 +126,47 @@ export function renderOrderSummary() {
   document.querySelector('.js-order-summary')
     .innerHTML = cartSummaryHTML;
 
+  updateCheckoutHeaderQuantity();
+
   document.querySelectorAll('.js-delete-link')
     .forEach((link) => {
       link.addEventListener('click', () => {
-        const productId = link.dataset.productId;
-        removeFromCart(productId);
-
-        const container = document.querySelector(
-          `.js-cart-item-container-${productId}`
-        );
-        container.remove();
-
+        removeFromCart(link.dataset.productId);
+        renderOrderSummary();
         renderPaymentSummary();
       });
     });
+
+  document.querySelectorAll('.js-update-link')
+    .forEach((link) => {
+      link.addEventListener('click', () => {
+        const productId = link.dataset.productId;
+        const container = document.querySelector(
+          `.js-cart-item-container-${productId}`
+        );
+        container.classList.add('is-editing-quantity');
+        document.querySelector(`.js-quantity-input-${productId}`).focus();
+      });
+    });
+
+  document.querySelectorAll('.js-save-link')
+    .forEach((link) => {
+      link.addEventListener('click', () => {
+        saveQuantity(link.dataset.productId);
+      });
+    });
+
+  cart.forEach((cartItem) => {
+    const input = document.querySelector(
+      `.js-quantity-input-${cartItem.productId}`
+    );
+
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        saveQuantity(cartItem.productId);
+      }
+    });
+  });
 
   document.querySelectorAll('.js-delivery-option')
     .forEach((element) => {
@@ -142,4 +177,33 @@ export function renderOrderSummary() {
         renderPaymentSummary();
       });
     });
+}
+
+function saveQuantity(productId) {
+  const input = document.querySelector(`.js-quantity-input-${productId}`);
+  const newQuantity = Number(input.value);
+
+  if (!Number.isInteger(newQuantity) ||
+      newQuantity < MIN_QUANTITY ||
+      newQuantity > MAX_QUANTITY) {
+    input.classList.add('quantity-input-error');
+    return;
+  }
+
+  updateQuantity(productId, newQuantity);
+  renderOrderSummary();
+  renderPaymentSummary();
+}
+
+function updateCheckoutHeaderQuantity() {
+  updateCartQuantityDisplay();
+
+  const element = document.querySelector('.js-checkout-item-count');
+
+  if (element) {
+    const quantity = cart.reduce(
+      (total, cartItem) => total + cartItem.quantity, 0
+    );
+    element.innerHTML = `${quantity} ${quantity === 1 ? 'item' : 'items'}`;
+  }
 }
