@@ -1,0 +1,17 @@
+{
+  "name": "amazon-project",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SuperSimpleDev JavaScript course exercises and the Amazon clone project",
+  "type": "module",
+  "scripts": {
+    "start": "node tools/serve.mjs",
+    "lint": "eslint .",
+    "test": "node --test tools/*.test.mjs && node tools/run-tests.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.15.0",
+    "eslint": "9.15.0",
+    "puppeteer-core": "23.9.0"
+  }
+}

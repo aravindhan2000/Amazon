@@ -1,17 +1,54 @@
-import {cart, addToCart} from '../data/cart.js';
-import {products, loadProducts} from '../data/products.js';
-import {formatCurrency} from './utils/money.js';
+import {addToCart} from '../data/cart.js';
+import {loadProductsFetch, searchProducts} from '../data/products.js';
+import {
+  getSearchQuery,
+  initHeaderSearch,
+  updateCartQuantityDisplay
+} from './shared/header.js';
 
-loadProducts(renderProductsGrid);
+const addedMessageTimeouts = {};
+
+export async function loadPage() {
+  initHeaderSearch();
+  updateCartQuantityDisplay();
+
+  try {
+    await loadProductsFetch();
+  } catch {
+    document.querySelector('.js-products-grid').innerHTML = `
+      <div class="no-results-message">
+        We couldn't load the products. Please check your connection and
+        <a class="link-primary" href="amazon.html">try again</a>.
+      </div>
+    `;
+    return;
+  }
+
+  renderProductsGrid();
+}
 
 function renderProductsGrid() {
+  const search = getSearchQuery();
+  const matchingProducts = searchProducts(search);
+
+  if (matchingProducts.length === 0) {
+    document.querySelector('.js-products-grid').innerHTML = `
+      <div class="no-results-message">
+        No products match "${search}".
+        <a class="link-primary" href="amazon.html">View all products</a>
+      </div>
+    `;
+    return;
+  }
+
   let productsHTML = '';
 
-  products.forEach((product) => {
+  matchingProducts.forEach((product) => {
     productsHTML += `
       <div class="product-container">
         <div class="product-image-container">
           <img class="product-image"
+            alt="${product.name}"
             src="${product.image}">
         </div>
 
@@ -21,6 +58,7 @@ function renderProductsGrid() {
 
         <div class="product-rating-container">
           <img class="product-rating-stars"
+            alt="Rating: ${product.rating.stars} out of 5"
             src="${product.getStarsUrl()}">
           <div class="product-rating-count link-primary">
             ${product.rating.count}
@@ -32,7 +70,7 @@ function renderProductsGrid() {
         </div>
 
         <div class="product-quantity-container">
-          <select>
+          <select class="js-quantity-selector-${product.id}">
             <option selected value="1">1</option>
             <option value="2">2</option>
             <option value="3">3</option>
@@ -50,8 +88,8 @@ function renderProductsGrid() {
 
         <div class="product-spacer"></div>
 
-        <div class="added-to-cart">
-          <img src="images/icons/checkmark.png">
+        <div class="added-to-cart js-added-to-cart-${product.id}">
+          <img src="images/icons/checkmark.png" alt="">
           Added
         </div>
 
@@ -65,23 +103,28 @@ function renderProductsGrid() {
 
   document.querySelector('.js-products-grid').innerHTML = productsHTML;
 
-  function updateCartQuantity() {
-    let cartQuantity = 0;
-
-    cart.forEach((cartItem) => {
-      cartQuantity += cartItem.quantity;
-    });
-
-    document.querySelector('.js-cart-quantity')
-      .innerHTML = cartQuantity;
-  }
-
   document.querySelectorAll('.js-add-to-cart')
     .forEach((button) => {
       button.addEventListener('click', () => {
         const productId = button.dataset.productId;
-        addToCart(productId);
-        updateCartQuantity();
+        const quantity = Number(
+          document.querySelector(`.js-quantity-selector-${productId}`).value
+        );
+
+        addToCart(productId, quantity);
+        updateCartQuantityDisplay();
+        showAddedMessage(productId);
       });
     });
+}
+
+function showAddedMessage(productId) {
+  const message = document.querySelector(`.js-added-to-cart-${productId}`);
+  message.classList.add('added-to-cart-visible');
+
+  clearTimeout(addedMessageTimeouts[productId]);
+
+  addedMessageTimeouts[productId] = setTimeout(() => {
+    message.classList.remove('added-to-cart-visible');
+  }, 2000);
 }

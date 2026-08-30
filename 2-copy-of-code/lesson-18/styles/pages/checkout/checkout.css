@@ -209,3 +209,44 @@
   margin-top: 11px;
   margin-bottom: 15px;
 }
+
+.quantity-input,
+.save-quantity-link {
+  display: none;
+}
+
+.is-editing-quantity .quantity-label,
+.is-editing-quantity .update-quantity-link {
+  display: none;
+}
+
+.is-editing-quantity .quantity-input,
+.is-editing-quantity .save-quantity-link {
+  display: inline-block;
+}
+
+.quantity-input {
+  width: 60px;
+  margin-right: 8px;
+  padding: 2px 4px;
+}
+
+.quantity-input-error {
+  border: 1px solid rgb(204, 12, 57);
+}
+
+.empty-cart-message,
+.checkout-error-message {
+  font-size: 18px;
+  padding: 20px 0;
+}
+
+.payment-summary-error {
+  color: rgb(204, 12, 57);
+  margin-top: 10px;
+}
+
+.place-order-button[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

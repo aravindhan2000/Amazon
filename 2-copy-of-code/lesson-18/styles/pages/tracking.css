@@ -79,3 +79,8 @@
   border-radius: 50px;
   width: 50%;
 }
+
+.tracking-message {
+  font-size: 18px;
+  padding: 20px 0;
+}
