@@ -1,4 +1,4 @@
-import {cart, calculateCartQuantity} from '../../data/cart.js';
+import {cart, calculateCartQuantity, clearCart} from '../../data/cart.js';
 import {getProduct} from '../../data/products.js';
 import {getDeliveryOption} from '../../data/deliveryOptions.js';
 import {formatCurrency} from '../utils/money.js';
@@ -74,31 +74,39 @@ export function renderPaymentSummary() {
   document.querySelector('.js-payment-summary')
     .innerHTML = paymentSummaryHTML;
 
-  document.querySelector('.js-place-order')
-    .addEventListener('click', async () => {
-      try {
-        const response = await fetch('https://supersimplebackend.dev/orders', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            cart: cart
-          })
-        });
+  const placeOrderButton = document.querySelector('.js-place-order');
 
-        if (!response.ok) {
-          throw new Error(`Failed to place order: ${response.status}`);
-        }
+  placeOrderButton.addEventListener('click', async () => {
+    if (placeOrderButton.disabled) {
+      return;
+    }
+    placeOrderButton.disabled = true;
 
-        const order = await response.json();
-        addOrder(order);
+    try {
+      const response = await fetch('https://supersimplebackend.dev/orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          cart: cart
+        })
+      });
 
-        window.location.href = 'orders.html';
-
-      } catch {
-        document.querySelector('.js-payment-summary-error').innerHTML =
-          'Unexpected error. Please try again later.';
+      if (!response.ok) {
+        throw new Error(`Failed to place order: ${response.status}`);
       }
-    });
+
+      const order = await response.json();
+      addOrder(order);
+      clearCart();
+
+      window.location.href = 'orders.html';
+
+    } catch {
+      placeOrderButton.disabled = false;
+      document.querySelector('.js-payment-summary-error').innerHTML =
+        'Unexpected error. Please try again later.';
+    }
+  });
 }

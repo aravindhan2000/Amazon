@@ -51,4 +51,56 @@ describe('test suite: renderPaymentSummary', () => {
 
     expect(document.querySelector('.js-place-order').disabled).toEqual(true);
   });
+
+  it('only sends one request when the order button is clicked rapidly', () => {
+    spyOn(localStorage, 'getItem').and.callFake(() => {
+      return JSON.stringify([{
+        productId: productId1,
+        quantity: 1,
+        deliveryOptionId: '1'
+      }]);
+    });
+    loadFromStorage();
+
+    const fetchSpy = spyOn(window, 'fetch').and.returnValue(
+      new Promise(() => {})
+    );
+
+    renderPaymentSummary();
+
+    const button = document.querySelector('.js-place-order');
+    button.click();
+    button.click();
+    button.click();
+
+    expect(fetchSpy.calls.count()).toEqual(1);
+    expect(button.disabled).toEqual(true);
+  });
+
+  it('re-enables the order button when the request fails', async () => {
+    spyOn(localStorage, 'getItem').and.callFake(() => {
+      return JSON.stringify([{
+        productId: productId1,
+        quantity: 1,
+        deliveryOptionId: '1'
+      }]);
+    });
+    loadFromStorage();
+
+    spyOn(window, 'fetch').and.returnValue(
+      Promise.reject(new Error('network error'))
+    );
+
+    renderPaymentSummary();
+
+    const button = document.querySelector('.js-place-order');
+    button.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(button.disabled).toEqual(false);
+    expect(
+      document.querySelector('.js-payment-summary-error').innerText
+    ).toContain('Unexpected error');
+  });
 });

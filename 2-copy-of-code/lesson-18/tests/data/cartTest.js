@@ -2,6 +2,7 @@ import {
   addToCart,
   calculateCartQuantity,
   cart,
+  clearCart,
   loadFromStorage,
   removeFromCart,
   updateDeliveryOption,
@@ -104,5 +105,20 @@ describe('test suite: cart quantities', () => {
     removeFromCart(productId1);
     expect(cart.length).toEqual(1);
     expect(cart[0].productId).toEqual(productId2);
+  });
+});
+
+describe('test suite: clearCart', () => {
+  it('empties the cart and saves it to storage', () => {
+    loadCartWith([{
+      productId: productId1,
+      quantity: 2,
+      deliveryOptionId: '1'
+    }]);
+
+    clearCart();
+
+    expect(cart.length).toEqual(0);
+    expect(localStorage.setItem).toHaveBeenCalledWith('cart', '[]');
   });
 });

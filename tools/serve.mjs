@@ -1,7 +1,7 @@
 import {createServer} from 'node:http';
 import {createReadStream} from 'node:fs';
 import {stat} from 'node:fs/promises';
-import {extname, join, normalize} from 'node:path';
+import {extname, join, normalize, resolve as resolvePath, sep} from 'node:path';
 
 const CONTENT_TYPES = {
   '.html': 'text/html',
@@ -18,26 +18,72 @@ const CONTENT_TYPES = {
 };
 
 export function startServer(root = process.cwd(), port = 0) {
+  const rootPath = resolvePath(root);
+
   const server = createServer(async (request, response) => {
-    const urlPath = decodeURIComponent(new URL(
-      request.url, 'http://localhost'
-    ).pathname);
-    const filePath = join(root, normalize(urlPath).replace(/^(\.\.[/\\])+/, ''));
+    const notFound = () => {
+      response.writeHead(404, {'Content-Type': 'text/plain'});
+      response.end('Not found');
+    };
+
+    let urlPath;
+    try {
+      urlPath = decodeURIComponent(new URL(
+        request.url, 'http://localhost'
+      ).pathname);
+    } catch {
+      response.writeHead(400, {'Content-Type': 'text/plain'});
+      response.end('Bad request');
+      return;
+    }
+
+    const relativePath = normalize(urlPath).replace(/^([/\\]|\.\.([/\\]|$))+/, '');
+    const filePath = resolvePath(rootPath, relativePath);
+
+    if (filePath !== rootPath && !filePath.startsWith(rootPath + sep)) {
+      response.writeHead(403, {'Content-Type': 'text/plain'});
+      response.end('Forbidden');
+      return;
+    }
+
+    let finalPath = filePath;
 
     try {
       const stats = await stat(filePath);
-      const finalPath = stats.isDirectory()
-        ? join(filePath, 'index.html')
-        : filePath;
 
-      response.writeHead(200, {
-        'Content-Type': CONTENT_TYPES[extname(finalPath)] || 'application/octet-stream'
-      });
-      createReadStream(finalPath).pipe(response);
+      if (stats.isDirectory()) {
+        finalPath = join(filePath, 'index.html');
+        const indexStats = await stat(finalPath);
+
+        if (!indexStats.isFile()) {
+          notFound();
+          return;
+        }
+      } else if (!stats.isFile()) {
+        notFound();
+        return;
+      }
     } catch {
-      response.writeHead(404, {'Content-Type': 'text/plain'});
-      response.end('Not found');
+      notFound();
+      return;
     }
+
+    const stream = createReadStream(finalPath);
+
+    stream.on('error', () => {
+      if (response.headersSent) {
+        response.destroy();
+        return;
+      }
+      response.writeHead(500, {'Content-Type': 'text/plain'});
+      response.end('Internal server error');
+    });
+
+    response.writeHead(200, {
+      'Content-Type':
+        CONTENT_TYPES[extname(finalPath)] || 'application/octet-stream'
+    });
+    stream.pipe(response);
   });
 
   return new Promise((resolve) => {

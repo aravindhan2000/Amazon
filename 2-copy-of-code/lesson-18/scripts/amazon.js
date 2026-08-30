@@ -8,13 +8,24 @@ import {
 
 const addedMessageTimeouts = {};
 
-async function loadPage() {
+export async function loadPage() {
   initHeaderSearch();
-  await loadProductsFetch();
-  renderProductsGrid();
   updateCartQuantityDisplay();
+
+  try {
+    await loadProductsFetch();
+  } catch {
+    document.querySelector('.js-products-grid').innerHTML = `
+      <div class="no-results-message">
+        We couldn't load the products. Please check your connection and
+        <a class="link-primary" href="amazon.html">try again</a>.
+      </div>
+    `;
+    return;
+  }
+
+  renderProductsGrid();
 }
-loadPage();
 
 function renderProductsGrid() {
   const search = getSearchQuery();
